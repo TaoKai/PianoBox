@@ -8,6 +8,7 @@ for ins in data.instruments:
     print(ins)
 
 note_dic = {}
+start_list = []
 # arr = rh.get_piano_roll()
 
 # for i, note in enumerate(rh.notes):
@@ -31,7 +32,12 @@ for ins in new_midi.instruments:
     for i, no in enumerate(ins.notes):
         # print(i, no)
         if no.start in note_dic.keys():
-            print(no)
-        note_dic[no.start] = no
+            note_dic[no.start].append(no)
+        else:
+            note_dic[no.start] = [no]
+            start_list.append(no.start)
+start_list.sort()
+for i, sl in enumerate(start_list):
+    print(i, note_dic[sl])
 new_midi.write('out_midi.mid')
 
