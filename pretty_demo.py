@@ -2,7 +2,7 @@ import os, sys
 import pretty_midi as pm
 import scipy.misc
 
-data = pm.PrettyMIDI('mozk310a.mid')
+data = pm.PrettyMIDI('bwv848.mid')
 
 for ins in data.instruments:
     print(ins)
@@ -35,6 +35,6 @@ for i, t in enumerate(time_list):
     note = note_dic[t]
     piano.notes.append(note)
     print(i, note)
-new_midi.instruments.append(rh)
+new_midi.instruments.append(piano)
 new_midi.write('out_midi.mid')
 
