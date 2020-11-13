@@ -80,18 +80,6 @@ def readBaiduTop():
     for ti in titles:
         print(ti)
 
-def readMySQL():
-    db = pymysql.connect('localhost', 'root', '900327', 'mydatabase', charset='utf8')
-    cursor = db.cursor()
-    sql = 'select name, team, position from nbaplayers'
-    try:
-        cursor.execute(sql)
-        res = cursor.fetchall()
-        print(res)
-    except:
-        print('select failed.')
-    db.close()
-
 def file_proc():
     path = 'midi_classics'
     dirs = [path+'/'+d for d in os.listdir(path)]
