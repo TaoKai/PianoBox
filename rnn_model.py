@@ -36,6 +36,7 @@ class PianoBox(nn.Module):
         h1 = self.bn(h1).reshape([1, -1, self.hidden_size])
         x2, h2 = self.gru1(x1, h1)
         x2 += res0
+        x2 = F.relu(x2)
         x2 = x2.reshape([-1, self.hidden_size, 12])
         x2 = self.bn(x2).reshape([12, -1, self.hidden_size])
         h2 = h2.reshape([-1, self.hidden_size, 1])

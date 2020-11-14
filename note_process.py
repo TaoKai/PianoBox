@@ -107,10 +107,20 @@ def get_music_range(pieces):
         'length':[999, -1],
         'velocity':[999, -1],
         'is_chord':[0, 1],
+        'offset_mean':0.0,
+        'length_mean':0.0,
     }
     rec_str = ''
+    offset_cnt = 0
+    length_cnt = 0
+    offset_total = 0
+    length_total = 0
+    offset_ratio = 1.0
+    length_ratio = 1.5
+    orcnt = 0
+    lrcnt = 0
     for i, pi in enumerate(pieces):
-        print('analysis', i, 'piece.')
+        print('analysis', i, 'pieces.')
         for no in pi:
             group = no[0]
             g_pitch = no[1]
@@ -139,8 +149,71 @@ def get_music_range(pieces):
                 dic['velocity'][0] = velocity
             if velocity>dic['velocity'][1]:
                 dic['velocity'][1] = velocity
-    open('raw_notes.txt', 'w').write(rec_str)
+            offset_total += offset
+            offset_cnt += 1
+            length_total += length
+            length_cnt += 1
+            if offset<=offset_ratio:
+                orcnt += 1
+            if length<=length_ratio:
+                lrcnt += 1
+    dic['offset_mean'] = offset_total/offset_cnt
+    dic['length_mean'] = length_total/length_cnt
+    dic['offset_ratio_count'] = orcnt/offset_cnt
+    dic['length_ratio_count'] = lrcnt/length_cnt
     return dic
+
+def convert_input_record(notes):
+    group_div = 8
+    pitch_div = 11
+    chord_div = 1
+    offset_div = 1
+    length_div = 1.5
+    velocity_div = 127
+    div_vec = np.array([[group_div, pitch_div, chord_div, offset_div, length_div, velocity_div]], dtype=np.float32)
+    notes = np.array(notes, dtype=np.float32)/div_vec
+    return notes
+
+def convert_label_record(note):
+    group_div = 8
+    pitch_div = 11
+    chord_div = 1
+    offset_div = 1
+    length_div = 1.5
+    velocity_div = 127
+    note[3] /= offset_div
+    note[4] /= length_div
+    note[5] /= velocity_div
+    return note
+
+def generate_np_records(pieces):
+    note_features = []
+    group_labels = []
+    pitch_labels = []
+    chord_labels = []
+    regression_labels = []
+    seq_len = 12
+    for j, notes in enumerate(pieces):
+        n_len = len(notes) - seq_len
+        for i in range(n_len-seq_len):
+            input_notes = notes[i:i+seq_len]
+            note = notes[i+seq_len]
+            input_notes = convert_input_record(input_notes)
+            note = convert_label_record(note)
+            note_features.append(input_notes)
+            group_labels.append(note[0])
+            pitch_labels.append(note[1])
+            chord_labels.append(note[2])
+            regression_labels.append(note[3:])
+        print(j, 'training pieces added.')
+    note_features = np.array(note_features, dtype=np.float32)
+    group_labels = np.array(group_labels, dtype=np.int32)
+    pitch_labels = np.array(pitch_labels, dtype=np.int32)
+    regression_labels = np.array(regression_labels, dtype=np.float32)
+    np.savez('train_data.npz', note_features=note_features, group_labels=group_labels,
+    pitch_labels=pitch_labels, chord_labels=chord_labels, regression_labels=regression_labels)
+
+
 
 if __name__ == "__main__":
     # notes = np.load('notes.npy', allow_pickle=True)
@@ -148,3 +221,4 @@ if __name__ == "__main__":
     dic = get_music_range(pieces)
     for k, v in dic.items():
         print(k, v)
+    generate_np_records(pieces)
