@@ -17,9 +17,13 @@ class PianoBox(nn.Module):
         self.gru3 = nn.GRU(hidden_size, hidden_size, 1)
         self.linear = nn.Linear(input_size, hidden_size)
         self.bn = nn.BatchNorm1d(hidden_size)
-        self.drop = nn.Dropout(p=0.5)
+        self.drop = nn.Dropout(p=0.2)
         self.softmax = nn.Softmax()
         self.attn = nn.Linear(hidden_size, 1)
+        self.group_cls = nn.Linear(hidden_size, 9)
+        self.pitch_cls = nn.Linear(hidden_size, 12)
+        self.chord_cls = nn.Linear(hidden_size, 2)
+        self.olv_reg = nn.Linear(hidden_size, 3)
     
     def initHidden(self, batch_size):
         return torch.zeros(1, batch_size, self.hidden_size, device=device)
@@ -60,11 +64,15 @@ class PianoBox(nn.Module):
         attn_vec = self.softmax(attn_vec.reshape([-1, 12])).reshape([-1, 12, 1])
         x4 = attn_vec*x4
         x_out = F.relu(x4.sum(axis=1))
-        return x_out
+        group_prob = self.softmax(self.group_cls(x_out))
+        pitch_prob = self.softmax(self.pitch_cls(x_out))
+        chord_prob = self.softmax(self.chord_cls(x_out))
+        olv_vec = F.relu(self.olv_reg(x_out))
+        return group_prob, pitch_prob, chord_prob, olv_vec
 
 
 if __name__ == "__main__":
-    piano = PianoBox(4, 128)
-    x = torch.randn(8, 12, 4)
+    piano = PianoBox(6, 128)
+    x = torch.randn(16, 12, 6)
     x = piano(x)
     print(x, x.size())
