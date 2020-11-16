@@ -2,6 +2,10 @@ import pretty_midi
 import os, sys
 import numpy as np
 import json
+import random
+import torch
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def list_midi(path):
     files = []
@@ -213,12 +217,44 @@ def generate_np_records(pieces):
     np.savez('train_data.npz', note_features=note_features, group_labels=group_labels,
     pitch_labels=pitch_labels, chord_labels=chord_labels, regression_labels=regression_labels)
 
-
+class Note(object):
+    def __init__(self, data_path, batch_size):
+        self.batch_size = batch_size
+        self.cursor = 0
+        self.data_path = data_path
+        self.data = np.load(self.data_path)
+        self.note_features = self.data['note_features']
+        self.group_labels = self.data['group_labels']
+        self.pitch_labels = self.data['pitch_labels']
+        self.chord_labels = self.data['chord_labels']
+        self.regression_labels = self.data['regression_labels']
+        self.length = self.group_labels.shape[0]
+        self.indices = list(np.arange(self.length))
+        random.shuffle(self.indices)
+    
+    def next(self):
+        if self.cursor+self.batch_size<self.length:
+            batch_indices = self.indices[self.cursor:self.cursor+self.batch_size]
+            note_features = torch.from_numpy(self.note_features[batch_indices]).to(device)
+            group_labels = torch.from_numpy(self.group_labels[batch_indices]).to(device)
+            pitch_labels = torch.from_numpy(self.pitch_labels[batch_indices]).to(device)
+            chord_labels = torch.from_numpy(self.chord_labels[batch_indices]).to(device)
+            regression_labels = torch.from_numpy(self.regression_labels[batch_indices]).to(device)
+            self.cursor += self.batch_size
+            return [note_features, group_labels, pitch_labels, chord_labels, regression_labels]
+        else:
+            self.cursor = 0
+            random.shuffle(self.indices)
+            return self.next()
 
 if __name__ == "__main__":
     # notes = np.load('notes.npy', allow_pickle=True)
-    pieces = read_pretty('midi_classics/Adson')
-    dic = get_music_range(pieces)
-    for k, v in dic.items():
-        print(k, v)
-    generate_np_records(pieces)
+    # pieces = read_pretty('midi_classics/Adson')
+    # dic = get_music_range(pieces)
+    # for k, v in dic.items():
+    #     print(k, v)
+    # generate_np_records(pieces)
+    note = Note('train_data.npz', 16)
+    while True:
+        nf, gl, pl, cl, regl = note.next()
+        print(note.cursor, nf.size(), gl.size(), pl.size(), cl.size(), regl.size())
