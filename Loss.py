@@ -24,21 +24,19 @@ class PBLoss(nn.Module):
         self.cosloss = CosineLoss()
         self.smoothl1 = nn.SmoothL1Loss()
     
-    def forward(self, group_prob, pitch_prob, chord_prob, olv_vec, group_labels, pitch_labels, chord_labels, olv_labels):
-        group_loss = self.cosloss(group_prob, group_labels.long())
+    def forward(self, pitch_prob, olv_vec, pitch_labels, olv_labels):
         pitch_loss = self.cosloss(pitch_prob, pitch_labels.long())
-        chord_loss = self.cosloss(chord_prob, chord_labels.long())
         olv_loss = self.smoothl1(olv_vec, olv_labels)
-        total_loss = group_loss+pitch_loss+chord_loss+olv_loss
-        print('total-loss:', total_loss.detach().cpu().numpy(), 'g-loss:', group_loss.detach().cpu().numpy(), 'p-loss:', pitch_loss.detach().cpu().numpy(), 'c-loss:', chord_loss.detach().cpu().numpy(), 'olv-loss:', olv_loss.detach().cpu().numpy())
+        total_loss = pitch_loss+olv_loss
+        print('total-loss:', total_loss.detach().cpu().numpy(), 'p-loss:', pitch_loss.detach().cpu().numpy(), 'olv-loss:', olv_loss.detach().cpu().numpy())
         return total_loss
 
 if __name__ == "__main__":
     from rnn_model import PianoBox
     from note_process import Note
-    PB = PianoBox(6, 128)
+    PB = PianoBox(512)
     note = Note('train_data.npz', 16)
-    nf, gl, pl, cl, regl = note.next()
-    group_prob, pitch_prob, chord_prob, olv_vec = PB(nf)
+    p, o, pl, ol = note.next()
+    pitch_prob, olv_vec, _ = PB(p, o)
     pbloss = PBLoss()
-    cost = pbloss(group_prob, pitch_prob, chord_prob, olv_vec, gl, pl, cl, regl)
+    cost = pbloss(pitch_prob, olv_vec, pl, ol)

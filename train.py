@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train(epoch, batch_size=32):
     note_data = Note('train_data.npz', batch_size)
-    model = PianoBox(6, 256)
+    model = PianoBox(512)
     optim = Adam(model.parameters(), lr=1e-4)
     loss = PBLoss()
     model.to(device)
@@ -20,10 +20,10 @@ def train(epoch, batch_size=32):
         step_cnt = 0
         for j in range(note_data.length//batch_size):
             print('epoch', i, 'step', j, end=' ')
-            nf, gl, pl, cl, regl = note_data.next()
+            p, o, pl, ol = note_data.next()
             optim.zero_grad()
-            group_prob, pitch_prob, chord_prob, olv_vec = model(nf)
-            cost = loss(group_prob, pitch_prob, chord_prob, olv_vec, gl, pl, cl, regl)
+            pitch_prob, olv_vec, _ = model(p, o)
+            cost = loss(pitch_prob, olv_vec, pl, ol)
             cost.backward()
             optim.step()
             step_cnt += 1
@@ -34,6 +34,6 @@ def train(epoch, batch_size=32):
             torch.save(model.state_dict(), 'piano_model.pth')
 
 if __name__ == "__main__":
-    train(20)
+    train(10000, 128)
 
             

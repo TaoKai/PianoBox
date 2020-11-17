@@ -83,7 +83,7 @@ def convert_to_trainable_notes(notes):
     }
     trainable_notes = []
     for i, no in enumerate(notes):
-        raw_pit = no.pitch
+        raw_pit = no.pitch-21
         group = 4
         g_pitch = 0
         for k, v in group_dic.items():
@@ -99,7 +99,7 @@ def convert_to_trainable_notes(notes):
                 is_chord = 1
         length = no.end-no.start
         velocity = no.velocity
-        info = [group, g_pitch, is_chord, offset, length, velocity]
+        info = [raw_pit, offset, length, velocity]
         trainable_notes.append(info)
     return trainable_notes
 
@@ -168,54 +168,47 @@ def get_music_range(pieces):
     return dic
 
 def convert_input_record(notes):
-    group_div = 8
-    pitch_div = 11
-    chord_div = 1
     offset_div = 1
     length_div = 1.5
     velocity_div = 127
-    div_vec = np.array([[group_div, pitch_div, chord_div, offset_div, length_div, velocity_div]], dtype=np.float32)
-    notes = np.array(notes, dtype=np.float32)/div_vec
-    return notes
+    div_vec = np.array([[offset_div, length_div, velocity_div]], dtype=np.float32)
+    notes = np.array(notes, dtype=np.float32)
+    olvs = notes[:, 1:]/div_vec
+    pitches = notes[:, 0].astype(np.int32)
+    return (pitches, olvs)
 
 def convert_label_record(note):
-    group_div = 8
-    pitch_div = 11
-    chord_div = 1
     offset_div = 1
     length_div = 1.5
     velocity_div = 127
-    note[3] /= offset_div
-    note[4] /= length_div
-    note[5] /= velocity_div
+    note[1] /= offset_div
+    note[2] /= length_div
+    note[3] /= velocity_div
     return note
 
 def generate_np_records(pieces):
-    note_features = []
-    group_labels = []
+    pitches = []
+    olvs = []
     pitch_labels = []
-    chord_labels = []
-    regression_labels = []
+    olv_labels = []
     seq_len = 12
     for j, notes in enumerate(pieces):
         n_len = len(notes) - seq_len
         for i in range(n_len-seq_len):
             input_notes = notes[i:i+seq_len]
             note = notes[i+seq_len]
-            input_notes = convert_input_record(input_notes)
+            p, o = convert_input_record(input_notes)
             note = convert_label_record(note)
-            note_features.append(input_notes)
-            group_labels.append(note[0])
-            pitch_labels.append(note[1])
-            chord_labels.append(note[2])
-            regression_labels.append(note[3:])
-        print(j, 'training pieces added.')
-    note_features = np.array(note_features, dtype=np.float32)
-    group_labels = np.array(group_labels, dtype=np.int32)
+            pitches.append(p)
+            olvs.append(o)
+            pitch_labels.append(note[0])
+            olv_labels.append(note[1:])
+        print(j, 'pieces added.')
+    pitches = np.array(pitches, dtype=np.int32)
+    olvs = np.array(olvs, dtype=np.float32)
     pitch_labels = np.array(pitch_labels, dtype=np.int32)
-    regression_labels = np.array(regression_labels, dtype=np.float32)
-    np.savez('train_data.npz', note_features=note_features, group_labels=group_labels,
-    pitch_labels=pitch_labels, chord_labels=chord_labels, regression_labels=regression_labels)
+    olv_labels = np.array(olv_labels, dtype=np.float32)
+    np.savez('train_data.npz', pitches=pitches, olvs=olvs, pitch_labels=pitch_labels, olv_labels=olv_labels)
 
 class Note(object):
     def __init__(self, data_path, batch_size):
@@ -223,38 +216,32 @@ class Note(object):
         self.cursor = 0
         self.data_path = data_path
         self.data = np.load(self.data_path)
-        self.note_features = self.data['note_features']
-        self.group_labels = self.data['group_labels']
+        self.pitches = self.data['pitches']
+        self.olvs = self.data['olvs']
         self.pitch_labels = self.data['pitch_labels']
-        self.chord_labels = self.data['chord_labels']
-        self.regression_labels = self.data['regression_labels']
-        self.length = self.group_labels.shape[0]
+        self.olv_labels = self.data['olv_labels']
+        self.length = self.pitch_labels.shape[0]
         self.indices = list(np.arange(self.length))
         random.shuffle(self.indices)
     
     def next(self):
         if self.cursor+self.batch_size<self.length:
             batch_indices = self.indices[self.cursor:self.cursor+self.batch_size]
-            note_features = torch.from_numpy(self.note_features[batch_indices]).to(device)
-            group_labels = torch.from_numpy(self.group_labels[batch_indices]).to(device)
+            pitches = torch.from_numpy(self.pitches[batch_indices]).to(device)
+            olvs = torch.from_numpy(self.olvs[batch_indices]).to(device)
             pitch_labels = torch.from_numpy(self.pitch_labels[batch_indices]).to(device)
-            chord_labels = torch.from_numpy(self.chord_labels[batch_indices]).to(device)
-            regression_labels = torch.from_numpy(self.regression_labels[batch_indices]).to(device)
+            olv_labels = torch.from_numpy(self.olv_labels[batch_indices]).to(device)
             self.cursor += self.batch_size
-            return [note_features, group_labels, pitch_labels, chord_labels, regression_labels]
+            return [pitches, olvs, pitch_labels, olv_labels]
         else:
             self.cursor = 0
             random.shuffle(self.indices)
             return self.next()
 
 if __name__ == "__main__":
-    # notes = np.load('notes.npy', allow_pickle=True)
-    # pieces = read_pretty('midi_classics/Adson')
-    # dic = get_music_range(pieces)
-    # for k, v in dic.items():
-    #     print(k, v)
+    # pieces = read_pretty('midi_classics/Bach')
     # generate_np_records(pieces)
-    note = Note('train_data.npz', 16)
+    note = Note('train_data.npz', 32)
     while True:
-        nf, gl, pl, cl, regl = note.next()
-        print(note.cursor, nf.size(), gl.size(), pl.size(), cl.size(), regl.size())
+        p, o, pl, ol = note.next()
+        print(note.cursor, p.size(), o.size(), pl.size(), ol.size())
