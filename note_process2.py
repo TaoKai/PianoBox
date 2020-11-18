@@ -99,9 +99,28 @@ def get_map_index(pieces):
     json_str = json.dumps(all_dic)
     open('raw_pieces.json', 'w', 'utf-8').write(json_str)
             
+class Note(object):
+    def __init__(self, path):
+        self.data = json.loads(open(path, 'r', 'utf-8').read())
+        self.pieces = self.data['data']
+        self.chord_map = self.data['map']
+        self.batch_size = len(self.pieces)
+        self.cursors = list(np.zeros(self.batch_size, dtype=np.int32))
+        self.piece_lens = [len(pi[0]) for pi in self.pieces]
+    
+    def next(self):
+        note_inputs = []
+        off_inputs = []
+        note_labels = []
+        off_labels = []
+        mask = list(np.ones(self.batch_size, dtype=np.float32))
+        
+
 
 if __name__ == "__main__":
-    path = 'midi_classics/Bach'
-    pieces = read_pretty(path)
-    get_map_index(pieces)
+    # path = 'midi_classics/Bach'
+    # pieces = read_pretty(path)
+    # get_map_index(pieces)
+    note = Note('raw_pieces.json')
+
     

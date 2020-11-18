@@ -86,4 +86,4 @@ if __name__ == "__main__":
     neg_labels = torch.randint(0, 1000, [100])
     off_labels = torch.randn([10])
     cost = pianoCell.loss(note_emb, off_reg, note_labels, neg_labels, off_labels)
-    print(hc[0].shape)
+    print(cost)
