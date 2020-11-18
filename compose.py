@@ -6,7 +6,7 @@ import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_path = 'piano_model.pth'
-model = PianoBox(6, 1024).to(device)
+model = PianoBox(512).to(device)
 model.load_state_dict(torch.load(model_path, map_location=device))
 model.eval()
 
@@ -22,37 +22,32 @@ group_dic = {
     8: [i for i in range(108, 109)],
 }
 
-def predict_one_note(notes):
+def predict_one_note(notes, h_init=None):
     last_note = notes[-1]
     assert len(notes)==12
     notes = convert_to_trainable_notes(notes)
-    notes = convert_input_record(notes)
-    notes = torch.from_numpy(notes).reshape([1, 12, 6]).to(device)
-    group_prob, pitch_prob, chord_prob, olv_vec = model(notes)
-    group_prob = group_prob.detach().cpu().numpy()[0]
+    pitches, olvs = convert_input_record(notes)
+    pitches = torch.from_numpy(pitches).reshape([1, 12]).to(device)
+    olvs = torch.from_numpy(olvs).reshape([1, 12, 3]).to(device)
+    pitch_prob, olv_vec, h9 = model(pitches, olvs, h_init)
     pitch_prob = pitch_prob.detach().cpu().numpy()[0]
-    chord_prob = chord_prob.detach().cpu().numpy()[0]
     olv_vec = olv_vec.detach().cpu().numpy()[0]
-    group = np.argmax(group_prob)
     pitch = np.argmax(pitch_prob)
-    is_chord = np.argmax(chord_prob)
     offset = olv_vec[0]
     length = olv_vec[1]
     velocity = olv_vec[2]
-    true_pitch = group_dic[group][0]+pitch
-    if is_chord==1:
-        offset = last_note.start
-    else:
-        offset = last_note.start+offset*1.0
+    offset = last_note.start+offset*1.0
     offset_end = offset+length*1.5
     velocity = int(velocity*127)
-    next_note = pretty_midi.Note(velocity, true_pitch, offset, offset_end)
-    return next_note
+    velocity = 127 if velocity>127 else velocity
+    next_note = pretty_midi.Note(velocity, pitch, offset, offset_end)
+    return next_note, h9
 
 def compose_music(init_notes, number, out_path):
     new_notes = init_notes.copy()
+    h_init = None
     for i in range(number):
-        note = predict_one_note(init_notes)
+        note, h_init = predict_one_note(init_notes, h_init=h_init)
         new_notes.append(note)
         init_notes.append(note)
         init_notes = init_notes[1:]
