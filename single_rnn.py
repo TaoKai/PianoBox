@@ -73,17 +73,25 @@ class MultiEmbeddingLoss(nn.Module):
 def get_random_neg_labels(labels, emb_len, sample_num):
     emb_all = list(np.arange(emb_len))
     for l in labels:
-        emb_all.remove(l)
+        if l in emb_all:
+            emb_all.remove(l)
     random.shuffle(emb_all)
     return emb_all[:sample_num]
 
 if __name__ == "__main__":
-    pianoCell = PianoCell(768, 256, 1000)
-    notes = torch.randint(0, 1000, [10])
-    offs = torch.randn([10])
-    note_emb, off_reg, hc = pianoCell(notes, offs)
-    note_labels = torch.randint(0, 1000, [10])
-    neg_labels = torch.randint(0, 1000, [100])
-    off_labels = torch.randn([10])
+    from note_process2 import Note
+    note_train = Note('raw_pieces.json')
+    pianoCell = PianoCell(768, 256, note_train.embedding_len)
+    note_inputs, off_inputs, note_labels, off_labels, mask = note_train.next()
+    neg_labels = get_random_neg_labels(note_labels, note_train.embedding_len, 5000)
+    neg_labels = torch.tensor(neg_labels, dtype=torch.long)
+    mask = torch.tensor(mask, dtype=torch.float32).reshape(-1, 1)
+    hc = pianoCell.init_hidden(note_train.batch_size)
+    hc = (hc[0]*mask, hc[1]*mask)
+    note_inputs = torch.tensor(note_inputs, dtype=torch.long)
+    off_inputs = torch.tensor(off_inputs, dtype=torch.float32)
+    note_labels = torch.tensor(note_labels, dtype=torch.long)
+    off_labels = torch.tensor(off_labels, dtype=torch.float32)
+    note_emb, off_reg, hc = pianoCell(note_inputs, off_inputs)
     cost = pianoCell.loss(note_emb, off_reg, note_labels, neg_labels, off_labels)
     print(cost)

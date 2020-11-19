@@ -107,6 +107,7 @@ class Note(object):
         self.batch_size = len(self.pieces)
         self.cursors = list(np.zeros(self.batch_size, dtype=np.int32))
         self.piece_lens = [len(pi[0]) for pi in self.pieces]
+        self.embedding_len = len(list(self.data['map'].keys()))
     
     def next(self):
         note_inputs = []
@@ -138,7 +139,8 @@ if __name__ == "__main__":
     # pieces = read_pretty(path)
     # get_map_index(pieces)
     note = Note('raw_pieces.json')
-    while True:
+    print(note.embedding_len)
+    while False:
         note_inputs, off_inputs, note_labels, off_labels, mask = note.next()
 
     
