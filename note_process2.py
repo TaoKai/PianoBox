@@ -114,7 +114,23 @@ class Note(object):
         note_labels = []
         off_labels = []
         mask = list(np.ones(self.batch_size, dtype=np.float32))
-        
+        for i, c in enumerate(self.cursors):
+            if c == 0:
+                mask[i] = 0.0
+            notes = self.pieces[i][0]
+            offs = self.pieces[i][1]
+            note_input = notes[c]
+            note_label = notes[c+1]
+            off_input = float(offs[c])
+            off_label = float(offs[c+1])
+            self.cursors[i] = c+1
+            if c+1 == self.piece_lens[i]-1:
+                self.cursors[i] = 0
+            note_inputs.append(note_input)
+            off_inputs.append(off_input)
+            note_labels.append(note_label)
+            off_labels.append(off_label)
+        return note_inputs, off_inputs, note_labels, off_labels, mask
 
 
 if __name__ == "__main__":
@@ -122,5 +138,7 @@ if __name__ == "__main__":
     # pieces = read_pretty(path)
     # get_map_index(pieces)
     note = Note('raw_pieces.json')
+    while True:
+        note_inputs, off_inputs, note_labels, off_labels, mask = note.next()
 
     
