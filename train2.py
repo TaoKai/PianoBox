@@ -19,6 +19,7 @@ def train(epoch, step_num, data_path):
         hc = pianoCell.init_hidden(note_train.batch_size) if hc is None else hc
         for j in range(step_num):
             print('epoch', i, 'step', j, end=' ')
+            optim.zero_grad()
             note_inputs, off_inputs, note_labels, off_labels, mask = note_train.next()
             neg_labels = get_random_neg_labels(note_labels, note_train.embedding_len, 3000)
             neg_labels = torch.tensor(neg_labels, dtype=torch.long).to(device)
@@ -28,7 +29,8 @@ def train(epoch, step_num, data_path):
             off_inputs = torch.tensor(off_inputs, dtype=torch.float32).to(device)
             note_labels = torch.tensor(note_labels, dtype=torch.long).to(device)
             off_labels = torch.tensor(off_labels, dtype=torch.float32).to(device)
-            note_emb, off_reg, hc = pianoCell(note_inputs, off_inputs)
+            note_emb, off_reg, hc = pianoCell(note_inputs, off_inputs, hc)
+            hc = (hc[0].detach(), hc[1].detach())
             cost = pianoCell.loss(note_emb, off_reg, note_labels, neg_labels, off_labels)
             cost.backward()
             optim.step()
