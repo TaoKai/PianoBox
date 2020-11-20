@@ -20,12 +20,12 @@ class PianoCell(nn.Module):
         self.offset_reg = nn.Linear(self.hidden_size, 1)
         self.embeddings = nn.Embedding(note_num, self.note_size)
         self.offset_vec = nn.Linear(1, self.off_size)
-        self.smooth = nn.SmoothL1Loss()
+        self.smooth = nn.MSELoss()
         self.embedloss = MultiEmbeddingLoss()
     
     def init_hidden(self, batch_size):
-        h0 = torch.zeros([batch_size, self.hidden_size])
-        c0 = torch.zeros([batch_size, self.hidden_size])
+        h0 = torch.zeros([batch_size, self.hidden_size]).to(device)
+        c0 = torch.zeros([batch_size, self.hidden_size]).to(device)
         return (h0, c0)
 
     def forward(self, note_inputs, off_inputs, hc=None):
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     note_train = Note('raw_pieces.json')
     pianoCell = PianoCell(768, 256, note_train.embedding_len)
     note_inputs, off_inputs, note_labels, off_labels, mask = note_train.next()
-    neg_labels = get_random_neg_labels(note_labels, note_train.embedding_len, 5000)
+    neg_labels = get_random_neg_labels(note_labels, note_train.embedding_len, 3000)
     neg_labels = torch.tensor(neg_labels, dtype=torch.long)
     mask = torch.tensor(mask, dtype=torch.float32).reshape(-1, 1)
     hc = pianoCell.init_hidden(note_train.batch_size)

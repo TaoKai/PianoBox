@@ -106,7 +106,7 @@ if __name__ == "__main__":
     init_notes.append(note9)
     init_notes.append(note10)
     init_notes.append(note11)
-    compose_music(notes[3:3+12], 400, 'out_midi.mid')
+    compose_music(notes[0:0+12], 400, 'out_midi.mid')
 
 
 
