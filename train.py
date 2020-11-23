@@ -7,8 +7,8 @@ from torch.optim import Adam
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train(epoch, batch_size=32):
-    note_data = Note('train_data.npz', batch_size)
-    model = PianoBox(512)
+    note_data = Note('raw_pieces.json', batch_size)
+    model = PianoBox(512, note_data.note_num, note_data.offset_num)
     optim = Adam(model.parameters(), lr=1e-4)
     loss = PBLoss()
     model.to(device)

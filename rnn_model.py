@@ -12,7 +12,9 @@ class PianoResLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.lstm0 = nn.LSTM(self.hidden_size, self.hidden_size, 1)
         self.lstm1 = nn.LSTM(self.hidden_size, self.hidden_size, 1)
-        self.activ = nn.Tanh()
+        self.activ = nn.ReLU()
+        self.norm = nn.LayerNorm([12, self.hidden_size])
+        self.h_norm = nn.LayerNorm(self.hidden_size)
     
     def forward(self, x, h_init):
         h0 = h_init
@@ -21,17 +23,23 @@ class PianoResLSTM(nn.Module):
         x1 = self.activ(x1)
         x2, h2 = self.lstm1(x1, h1)
         x2 = x2+res0
+        x2 = x2.permute(1, 0, 2)
+        x2 = self.norm(x2)
         x2 = self.activ(x2)
+        x2 = x2.permute(1, 0, 2)
+        h2 = (self.h_norm(h2[0]), self.h_norm(h2[1]))
         return x2, h2
 
 
 class PianoBox(nn.Module):
-    def __init__(self, embed_size):
+    def __init__(self, embed_size, note_num, off_num):
         super(PianoBox, self).__init__()
+        self.note_num = note_num
+        self.off_num = off_num
         self.hidden_size = embed_size*2
         self.embed_size = embed_size
-        self.embeddings = nn.Embedding(88, embed_size)
-        self.linear = nn.Linear(3, embed_size)
+        self.embeddings = nn.Embedding(note_num, embed_size)
+        self.off_embeddings = nn.Embedding(off_num, embed_size)
         self.prLstm0 = PianoResLSTM(self.hidden_size)
         self.prLstm1 = PianoResLSTM(self.hidden_size)
         self.prLstm2 = PianoResLSTM(self.hidden_size)
@@ -43,8 +51,10 @@ class PianoBox(nn.Module):
         self.prLstm8 = PianoResLSTM(self.hidden_size)
         self.prLstm9 = PianoResLSTM(self.hidden_size)
         self.attn = nn.Linear(self.hidden_size, 1)
-        self.pitch_cls = nn.Linear(self.hidden_size, 88)
-        self.olv_reg = nn.Linear(self.hidden_size, 3)
+        self.pitch_cls = nn.Linear(self.hidden_size, note_num)
+        self.pitch_cls2 = nn.Linear(self.hidden_size, self.hidden_size)
+        self.olv_reg = nn.Linear(self.hidden_size, off_num)
+        self.olv_reg2 = nn.Linear(self.hidden_size, self.hidden_size)
     
     def initHidden(self, batch_size):
         return (torch.randn(1, batch_size, self.hidden_size, device=device), 
@@ -52,10 +62,11 @@ class PianoBox(nn.Module):
 
     def forward(self, pitches, olv_feats, h_init=None):
         pitches = pitches.long()
+        olv_feats = olv_feats.long()
         h_init = self.initHidden(pitches.shape[0]) if h_init is None else h_init
         embs = self.embeddings(pitches)
-        olv_feats = self.linear(olv_feats)
-        x_input = torch.cat([embs, olv_feats], dim=2).permute(1, 0, 2)
+        off_embs = self.off_embeddings(olv_feats)
+        x_input = torch.cat([embs, off_embs], dim=2).permute(1, 0, 2)
         x0, h0 = self.prLstm0(x_input, h_init)
         x1, h1 = self.prLstm1(x0, h0)
         x2, h2 = self.prLstm2(x1, h1)
@@ -69,14 +80,15 @@ class PianoBox(nn.Module):
         x9 = x9.permute(1, 0, 2)
         attn_vec = F.softmax(self.attn(x9).reshape(-1, 12), dim=1).reshape([-1, 12, 1])
         x9 = F.relu((attn_vec*x9).sum(axis=1))
-        pitch_prob = F.softmax(self.pitch_cls(x9), dim=1)
-        olv_vec = F.relu(self.olv_reg(x9))
+        pitch_prob = F.softmax(self.pitch_cls(self.pitch_cls2(x9)), dim=1)
+        olv_vec = F.softmax(self.olv_reg(self.olv_reg2(x9)), dim=1)
         return pitch_prob, olv_vec, h9
+        # return pitch_prob
 
 
 if __name__ == "__main__":
-    piano = PianoBox(512)
-    olv_feats = torch.randn([16, 12, 3])
+    piano = PianoBox(512, 88, 1000)
+    olv_feats = torch.randint(0, 1000, [16, 12])
     pitches = torch.randint(0, 88, [16, 12])
     x = piano(pitches, olv_feats)
     print(x, x.shape)

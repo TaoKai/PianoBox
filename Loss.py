@@ -26,17 +26,10 @@ class PBLoss(nn.Module):
     
     def forward(self, pitch_prob, olv_vec, pitch_labels, olv_labels):
         pitch_loss = self.cosloss(pitch_prob, pitch_labels.long())
-        olv_loss = self.smoothl1(olv_vec, olv_labels)
+        olv_loss = self.cosloss(olv_vec, olv_labels.long())
         total_loss = pitch_loss+olv_loss
         print('total-loss:', total_loss.detach().cpu().numpy(), 'p-loss:', pitch_loss.detach().cpu().numpy(), 'olv-loss:', olv_loss.detach().cpu().numpy())
         return total_loss
 
 if __name__ == "__main__":
-    from rnn_model import PianoBox
-    from note_process import Note
-    PB = PianoBox(512)
-    note = Note('train_data.npz', 16)
-    p, o, pl, ol = note.next()
-    pitch_prob, olv_vec, _ = PB(p, o)
-    pbloss = PBLoss()
-    cost = pbloss(pitch_prob, olv_vec, pl, ol)
+    pass
