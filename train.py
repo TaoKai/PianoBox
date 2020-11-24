@@ -7,9 +7,10 @@ from torch.optim import Adam
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train(epoch, batch_size=32):
+    model_path = 'piano_model.pth'
     note_data = Note('raw_pieces.json', batch_size)
     model = PianoBox(512, note_data.note_num, note_data.offset_num)
-    optim = Adam(model.parameters(), lr=1e-4)
+    optim = Adam(model.parameters(), lr=3e-5)
     loss = PBLoss()
     model.to(device)
     loss.to(device)
@@ -31,7 +32,7 @@ def train(epoch, batch_size=32):
         total_loss = total_loss/step_cnt
         if total_loss<=mean_loss:
             mean_loss = total_loss
-            torch.save(model.state_dict(), 'piano_model.pth')
+            torch.save(model.state_dict(), model_path)
 
 if __name__ == "__main__":
     train(10000, 128)

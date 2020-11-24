@@ -195,7 +195,7 @@ def generate_np_records(pieces):
     olvs = []
     pitch_labels = []
     olv_labels = []
-    seq_len = 12
+    seq_len = 30
     for j, notes in enumerate(pieces):
         n_len = len(notes) - seq_len
         for i in range(n_len-seq_len):
@@ -204,7 +204,7 @@ def generate_np_records(pieces):
             o_input = []
             for k, no in enumerate(nos):
                 pitch = no[0]
-                offset = int(no[1]*100)
+                offset = int(no[1]*20)
                 if offset not in off_dic:
                     off_dic[offset] = off_id
                     off_id += 1
@@ -260,7 +260,7 @@ class Note(object):
             return self.next()
 
 if __name__ == "__main__":
-    # pieces = read_pretty('midi_classics/Bach')
+    # pieces = read_pretty('midi_classics/Chopin')
     # generate_np_records(pieces)
     note = Note('raw_pieces.json', 32)
     while True:

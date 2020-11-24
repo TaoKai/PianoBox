@@ -12,9 +12,7 @@ class PianoResLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.lstm0 = nn.LSTM(self.hidden_size, self.hidden_size, 1)
         self.lstm1 = nn.LSTM(self.hidden_size, self.hidden_size, 1)
-        self.activ = nn.ReLU()
-        self.norm = nn.LayerNorm([12, self.hidden_size])
-        self.h_norm = nn.LayerNorm(self.hidden_size)
+        self.activ = nn.Tanh()
     
     def forward(self, x, h_init):
         h0 = h_init
@@ -23,11 +21,7 @@ class PianoResLSTM(nn.Module):
         x1 = self.activ(x1)
         x2, h2 = self.lstm1(x1, h1)
         x2 = x2+res0
-        x2 = x2.permute(1, 0, 2)
-        x2 = self.norm(x2)
         x2 = self.activ(x2)
-        x2 = x2.permute(1, 0, 2)
-        h2 = (self.h_norm(h2[0]), self.h_norm(h2[1]))
         return x2, h2
 
 
@@ -78,17 +72,17 @@ class PianoBox(nn.Module):
         x8, h8 = self.prLstm8(x7, h7)
         x9, h9 = self.prLstm9(x8, h8)
         x9 = x9.permute(1, 0, 2)
-        attn_vec = F.softmax(self.attn(x9).reshape(-1, 12), dim=1).reshape([-1, 12, 1])
+        attn_vec = F.softmax(self.attn(x9).reshape(-1, 30), dim=1).reshape([-1, 30, 1])
         x9 = F.relu((attn_vec*x9).sum(axis=1))
-        pitch_prob = F.softmax(self.pitch_cls(self.pitch_cls2(x9)), dim=1)
-        olv_vec = F.softmax(self.olv_reg(self.olv_reg2(x9)), dim=1)
+        pitch_prob = F.softmax(self.pitch_cls(F.tanh(self.pitch_cls2(x9))), dim=1)
+        olv_vec = F.softmax(self.olv_reg(F.tanh(self.olv_reg2(x9))), dim=1)
         return pitch_prob, olv_vec, h9
         # return pitch_prob
 
 
 if __name__ == "__main__":
     piano = PianoBox(512, 88, 1000)
-    olv_feats = torch.randint(0, 1000, [16, 12])
-    pitches = torch.randint(0, 88, [16, 12])
+    olv_feats = torch.randint(0, 1000, [16, 30])
+    pitches = torch.randint(0, 88, [16, 30])
     x = piano(pitches, olv_feats)
     print(x, x.shape)

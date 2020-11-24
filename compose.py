@@ -1,15 +1,20 @@
 import torch
 from rnn_model import PianoBox
 import pretty_midi
-from note_process import extract_sorted_notes, convert_to_trainable_notes, convert_input_record
+from note_process import extract_sorted_notes, convert_to_trainable_notes, convert_input_record, Note
 import numpy as np
 import random
 
+note_data = Note('raw_pieces.json', 128)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model_path = 'piano_model.pth'
-model = PianoBox(512).to(device)
+model = PianoBox(512, note_data.note_num, note_data.offset_num).to(device)
 model.load_state_dict(torch.load(model_path, map_location=device))
 model.eval()
+
+off_dic = note_data.off_id
+off_dic = {int(k):int(v) for k, v in off_dic.items()}
+off_reverse = {int(v):int(k) for k, v in off_dic.items()}
 
 group_dic = {
     0: [i for i in range(21, 24)],
@@ -23,26 +28,35 @@ group_dic = {
     8: [i for i in range(108, 109)],
 }
 
+def convert_to_index(notes):
+    pitches = []
+    olvs = []
+    for no in notes:
+        pitch = no[0]
+        offset = int(no[1]*100)
+        if offset not in off_dic.keys():
+            offset = 20
+        else:
+            offset = off_dic[offset]
+        pitches.append(pitch)
+        olvs.append(offset)
+    return torch.tensor(pitches), torch.tensor(olvs)
+
 def predict_one_note(notes, h_init=None):
     last_note = notes[-1]
     assert len(notes)==12
     notes = convert_to_trainable_notes(notes)
-    pitches, olvs = convert_input_record(notes)
-    pitches = torch.from_numpy(pitches).reshape([1, 12]).to(device)
-    olvs = torch.from_numpy(olvs).reshape([1, 12, 3]).to(device)
+    pitches, olvs = convert_to_index(notes)
+    pitches = pitches.reshape(1, 12).to(device)
+    olvs = olvs.reshape(1, 12).to(device)
     pitch_prob, olv_vec, h9 = model(pitches, olvs, h_init)
     pitch_prob = pitch_prob.detach().cpu().numpy()[0]
     olv_vec = olv_vec.detach().cpu().numpy()[0]
     pitch = np.argmax(pitch_prob)+21
-    offset = olv_vec[0]
-    length = olv_vec[1]
-    velocity = olv_vec[2]
-    if offset>0.01:
-        offset = 0.2
-    offset = last_note.start+offset*1.0
+    offset = off_reverse[np.argmax(olv_vec)]/100.0
+    velocity = 125
+    offset = last_note.start+offset
     offset_end = offset+0.5
-    velocity = int(velocity*127)
-    velocity = 127 if velocity>127 else velocity
     next_note = pretty_midi.Note(velocity, pitch, offset, offset_end)
     return next_note, h9
 
@@ -50,7 +64,7 @@ def compose_music(init_notes, number, out_path):
     new_notes = init_notes.copy()
     h_init = None
     for i in range(number):
-        note, h_init = predict_one_note(init_notes, h_init=None)
+        note, h_init = predict_one_note(init_notes, h_init=h_init)
         new_notes.append(note)
         init_notes.append(note)
         init_notes = init_notes[1:]
@@ -78,7 +92,7 @@ def save_midi(notes, out_path):
     
 
 if __name__ == "__main__":
-    midi_path = 'mozk310a.mid'
+    midi_path = 'bwv773.mid'
     midi = pretty_midi.PrettyMIDI(midi_path)
     notes = extract_sorted_notes(midi)
     init_notes = []
@@ -106,7 +120,7 @@ if __name__ == "__main__":
     init_notes.append(note9)
     init_notes.append(note10)
     init_notes.append(note11)
-    compose_music(notes[0:0+12], 400, 'out_midi.mid')
+    compose_music(init_notes[0:0+12], 400, 'out_midi.mid')
 
 
 
