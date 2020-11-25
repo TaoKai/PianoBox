@@ -9,7 +9,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def train(epoch, batch_size=32):
     model_path = 'piano_model.pth'
     note_data = Note('raw_pieces.json', batch_size)
-    model = PianoBox(512, note_data.note_num, note_data.offset_num)
+    model = PianoBox(256, 88)
     optim = Adam(model.parameters(), lr=3e-5)
     loss = PBLoss()
     model.to(device)

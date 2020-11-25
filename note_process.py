@@ -85,6 +85,10 @@ def convert_to_trainable_notes(notes):
     trainable_notes = []
     for i, no in enumerate(notes):
         raw_pit = no.pitch-21
+        if raw_pit>87:
+            raw_pit = 87
+        elif raw_pit<0:
+            raw_pit = 0
         group = 4
         g_pitch = 0
         for k, v in group_dic.items():
@@ -188,14 +192,11 @@ def convert_label_record(note):
     return note
 
 def generate_np_records(pieces):
-    pitch_dic = {i:i+21 for i in range(88)}
-    off_dic = {}
-    off_id = 0
     pitches = []
     olvs = []
     pitch_labels = []
     olv_labels = []
-    seq_len = 30
+    seq_len = 20
     for j, notes in enumerate(pieces):
         n_len = len(notes) - seq_len
         for i in range(n_len-seq_len):
@@ -204,25 +205,18 @@ def generate_np_records(pieces):
             o_input = []
             for k, no in enumerate(nos):
                 pitch = no[0]
-                offset = int(no[1]*20)
-                if offset not in off_dic:
-                    off_dic[offset] = off_id
-                    off_id += 1
+                offset = no[1]
                 if k<seq_len:
                     p_input.append(pitch)
-                    o_input.append(off_dic[offset])
+                    o_input.append(offset)
                 elif k==seq_len:
                     pitch_labels.append(pitch)
-                    olv_labels.append(off_dic[offset])
+                    olv_labels.append(offset)
             pitches.append(p_input)
             olvs.append(o_input)
             assert len(p_input)==seq_len
         print('add', j, 'pieces.')
-    data = {
-        'data':[pitches, olvs, pitch_labels, olv_labels],
-        'pitch_id': pitch_dic,
-        'offset_id': off_dic
-    }
+    data = [pitches, olvs, pitch_labels, olv_labels]
     data_str = json.dumps(data)
     open('raw_pieces.json', 'w', 'utf-8').write(data_str)
 
@@ -231,18 +225,13 @@ class Note(object):
         self.batch_size = batch_size
         self.cursor = 0
         self.data_path = data_path
-        self.dic = json.loads(open(data_path, 'r', 'utf-8').read())
-        self.data = self.dic['data']
-        self.pitch_id = self.dic['pitch_id']
-        self.off_id = self.dic['offset_id']
+        self.data = json.loads(open(data_path, 'r', 'utf-8').read())
         self.pitches = np.array(self.data[0], dtype=np.int32)
-        self.olvs = np.array(self.data[1], dtype=np.int32)
+        self.olvs = np.array(self.data[1], dtype=np.float32)
         self.pitch_labels = np.array(self.data[2], dtype=np.int32)
-        self.olv_labels = np.array(self.data[3], dtype=np.int32)
+        self.olv_labels = np.array(self.data[3], dtype=np.float32)
         self.length = self.pitch_labels.shape[0]
         self.indices = list(np.arange(self.length))
-        self.note_num = len(list(self.pitch_id.keys()))
-        self.offset_num = len(list(self.off_id.keys()))
         random.shuffle(self.indices)
     
     def next(self):

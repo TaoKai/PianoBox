@@ -33,9 +33,9 @@ def convert_to_index(notes):
     olvs = []
     for no in notes:
         pitch = no[0]
-        offset = int(no[1]*100)
+        offset = int(no[1]*20)
         if offset not in off_dic.keys():
-            offset = 20
+            offset = 4
         else:
             offset = off_dic[offset]
         pitches.append(pitch)
@@ -44,16 +44,15 @@ def convert_to_index(notes):
 
 def predict_one_note(notes, h_init=None):
     last_note = notes[-1]
-    assert len(notes)==12
     notes = convert_to_trainable_notes(notes)
     pitches, olvs = convert_to_index(notes)
-    pitches = pitches.reshape(1, 12).to(device)
-    olvs = olvs.reshape(1, 12).to(device)
+    pitches = pitches.reshape(1, -1).to(device)
+    olvs = olvs.reshape(1, -1).to(device)
     pitch_prob, olv_vec, h9 = model(pitches, olvs, h_init)
     pitch_prob = pitch_prob.detach().cpu().numpy()[0]
     olv_vec = olv_vec.detach().cpu().numpy()[0]
     pitch = np.argmax(pitch_prob)+21
-    offset = off_reverse[np.argmax(olv_vec)]/100.0
+    offset = off_reverse[np.argmax(olv_vec)]/20.0
     velocity = 125
     offset = last_note.start+offset
     offset_end = offset+0.5
@@ -64,19 +63,19 @@ def compose_music(init_notes, number, out_path):
     new_notes = init_notes.copy()
     h_init = None
     for i in range(number):
-        note, h_init = predict_one_note(init_notes, h_init=h_init)
+        note, h_init = predict_one_note(init_notes, h_init=None)
         new_notes.append(note)
         init_notes.append(note)
         init_notes = init_notes[1:]
-        if random.random()>0.95:
-            notes = new_notes[:12]
-            random.shuffle(notes)
-            note = notes[-1]
-            start = init_notes[-1].start+0.2
-            note.start = start
-            note.end = start+0.5
-            init_notes.append(note)
-        init_notes = init_notes[-12:]
+        # if random.random()>0.95:
+        #     notes = new_notes[:20]
+        #     random.shuffle(notes)
+        #     note = notes[-1]
+        #     start = init_notes[-1].start+0.2
+        #     note.start = start
+        #     note.end = start+0.5
+        #     init_notes.append(note)
+        #     init_notes = init_notes[-20:]
         print('predict', i, 'notes.')
     for n in new_notes:
         print(n)
@@ -92,35 +91,10 @@ def save_midi(notes, out_path):
     
 
 if __name__ == "__main__":
-    midi_path = 'bwv773.mid'
+    midi_path = 'bwv848.mid'
     midi = pretty_midi.PrettyMIDI(midi_path)
     notes = extract_sorted_notes(midi)
-    init_notes = []
-    note0 = pretty_midi.Note(100, 60, 0, 0.2)
-    note1 = pretty_midi.Note(100, 64, 0.2, 0.2+0.2)
-    note2 = pretty_midi.Note(100, 62, 0.4, 0.4+0.2)
-    note3 = pretty_midi.Note(100, 65, 0.6, 0.6+0.2)
-    note4 = pretty_midi.Note(100, 64, 0.8, 0.8+0.2)
-    note5 = pretty_midi.Note(100, 67, 1.0, 1.0+0.2)
-    note6 = pretty_midi.Note(100, 65, 1.2, 1.2+0.2)
-    note7 = pretty_midi.Note(100, 69, 1.4, 1.4+0.2)
-    note8 = pretty_midi.Note(100, 67, 1.6, 1.6+0.2)
-    note9 = pretty_midi.Note(100, 66, 1.8, 1.8+0.2)
-    note10 = pretty_midi.Note(100, 65, 2.0, 2.0+0.2)
-    note11 = pretty_midi.Note(100, 62, 2.2, 2.2+0.2)
-    init_notes.append(note0)
-    init_notes.append(note1)
-    init_notes.append(note2)
-    init_notes.append(note3)
-    init_notes.append(note4)
-    init_notes.append(note5)
-    init_notes.append(note6)
-    init_notes.append(note7)
-    init_notes.append(note8)
-    init_notes.append(note9)
-    init_notes.append(note10)
-    init_notes.append(note11)
-    compose_music(init_notes[0:0+12], 400, 'out_midi.mid')
+    compose_music(notes[0:0+20], 400, 'out_midi.mid')
 
 
 

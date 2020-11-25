@@ -22,11 +22,11 @@ class PBLoss(nn.Module):
     def __init__(self):
         super(PBLoss, self).__init__()
         self.cosloss = CosineLoss()
-        self.smoothl1 = nn.SmoothL1Loss()
+        self.reg_loss = nn.MSELoss()
     
     def forward(self, pitch_prob, olv_vec, pitch_labels, olv_labels):
         pitch_loss = self.cosloss(pitch_prob, pitch_labels.long())
-        olv_loss = self.cosloss(olv_vec, olv_labels.long())
+        olv_loss = self.reg_loss(olv_vec, olv_labels.float())
         total_loss = pitch_loss+olv_loss
         print('total-loss:', total_loss.detach().cpu().numpy(), 'p-loss:', pitch_loss.detach().cpu().numpy(), 'olv-loss:', olv_loss.detach().cpu().numpy())
         return total_loss
