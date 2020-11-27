@@ -70,7 +70,7 @@ def extract_sorted_notes(midi):
         notes += nos
     return notes
 
-def convert_to_trainable_notes(notes):
+def convert_to_trainable_notes(notes, offset=0.0):
     group_dic = {
         0: [i for i in range(21, 24)],
         1: [i for i in range(24, 36)],
@@ -95,7 +95,7 @@ def convert_to_trainable_notes(notes):
             if raw_pit in v:
                 group = k
                 g_pitch = raw_pit-v[0]
-        offset = 0.0
+        offset = offset
         is_chord = 0
         if i>0:
             pre_note = notes[i-1]
